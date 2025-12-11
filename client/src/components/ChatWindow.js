@@ -1,65 +1,167 @@
 // ChatWindow.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import io from "socket.io-client";
 
 const socket = io("https://chat-app-nine-mauve-28.vercel.app/");
 
-export default function ChatWindows() {
+export default function ChatWindow() {
   const [message, setMessage] = useState("");
   const [chat, setChat] = useState([]);
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   useEffect(() => {
     socket.on("receive_message", (data) => {
       setChat((prev) => [...prev, data]);
     });
+
     return () => socket.off("receive_message");
   }, []);
 
+  useEffect(() => {
+    scrollToBottom();
+  }, [chat]);
+
   const sendMessage = () => {
     if (message.trim() !== "") {
-      socket.emit("send_message", {
+      const msgData = {
         text: message,
-        time: new Date().toLocaleTimeString()
-      });
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        sender: socket.id
+      };
+      socket.emit("send_message", msgData);
+      setChat((prev) => [...prev, { ...msgData, sender: socket.id }]); // Show instantly
       setMessage("");
     }
   };
 
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter") sendMessage();
+  };
+
+  const isMyMessage = (msg) => msg.sender === socket.id;
+
   return (
-    <div style={{ padding: "20px", maxWidth: "400px", margin: "auto" }}>
-      <h2>💬 Real-Time Chat</h2>
-      <div
-        style={{
-          border: "1px solid #ccc",
-          height: "200px",
-          overflowY: "scroll",
-          marginBottom: "10px"
-        }}
-      >
+    <div style={{
+      maxWidth: "420px",
+      margin: "40px auto",
+      background: "#f5f5f5",
+      height: "90vh",
+      borderRadius: "16px",
+      overflow: "hidden",
+      boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
+      display: "flex",
+      flexDirection: "column"
+    }}>
+      {/* Header */}
+      <div style={{
+        background: "#075e54",
+        color: "white",
+        padding: "16px",
+        textAlign: "center",
+        fontSize: "1.2rem",
+        fontWeight: "bold"
+      }}>
+        💬 Real-Time Chat Room
+      </div>
+
+      {/* Messages Area */}
+      <div style={{
+        flex: 1,
+        overflowY: "auto",
+        padding: "16px",
+        background: "#e5ddd5 url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png') repeat",
+        backgroundSize: "auto"
+      }}>
         {chat.map((msg, i) => (
-          <p
+          <div
             key={i}
             style={{
-              textAlign: msg.sender === socket.id ? "right" : "left",
-              background: msg.sender === socket.id ? "#dcf8c6" : "#fff",
-              padding: "5px",
-              borderRadius: "5px",
-              margin: "5px"
+              marginBottom: "16px",
+              display: "flex",
+              justifyContent: isMyMessage(msg) ? "flex-end" : "flex-start"
             }}
           >
-            <strong>{msg.time}:</strong> {msg.text}
-          </p>
+            <div
+              style={{
+                maxWidth: "70%",
+                background: isMyMessage(msg) ? "#dcf8c6" : "white",
+                color: "black",
+                padding: "10px 14px",
+                borderRadius: "18px",
+                borderBottomRightRadius: isMyMessage(msg) ? "4px" : "18px",
+                borderBottomLeftRadius: isMyMessage(msg) ? "18px" : "4px",
+                boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
+                position: "relative",
+                wordWrap: "break-word"
+              }}
+            >
+              <div style={{ fontSize: "15px", lineHeight: "1.4" }}>
+                {msg.text}
+              </div>
+              <div style={{
+                fontSize: "11px",
+                color: "#999",
+                textAlign: "right",
+                marginTop: "4px"
+              }}>
+                {msg.time}
+              </div>
+            </div>
+          </div>
         ))}
+        <div ref={messagesEndRef} />
       </div>
-      <input
-        type="text"
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        style={{ width: "70%" }}
-      />
-      <button onClick={sendMessage} style={{ width: "25%", marginLeft: "5px" }}>
-        Send
-      </button>
+
+      {/* Input Area */}
+      <div style={{
+        padding: "12px",
+        background: "#f0f0f0",
+        borderTop: "1px solid #ddd",
+        display: "flex",
+        alignItems: "center",
+        gap: "10px"
+      }}>
+        <input
+          type="text"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyPress={handleKeyPress}
+          placeholder="Type a message..."
+          style={{
+            flex: 1,
+            padding: "12px 16px",
+            border: "none",
+            borderRadius: "25px",
+            outline: "none",
+            fontSize: "16px",
+            background: "white",
+            boxShadow: "inset 0 1px 3px rgba(0,0,0,0.1)"
+          }}
+        />
+        <button
+          onClick={sendMessage}
+          style={{
+            width: "48px",
+            height: "48px",
+            borderRadius: "50%",
+            background: "#075e54",
+            color: "white",
+            border: "none",
+            fontSize: "20px",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.2)"
+          }}
+        >
+          ➤
+        </button>
+      </div>
     </div>
   );
 }
